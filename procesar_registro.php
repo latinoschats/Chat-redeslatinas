@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mail->isSMTP();
         $mail->Host       = 'pyasowe@gmail.com'; // Cambia por tu servidor SMTP
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'usuario@tuservidor.com'; // Tu usuario SMTP
+        $mail->Username   = 'pyasowe@gmail.com'; // Cam'; // Tu usuario SMTP
         $mail->Password   = 'tu_password_segura';     // Tu contraseña SMTP
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // TLS
         $mail->Port       = 587;
