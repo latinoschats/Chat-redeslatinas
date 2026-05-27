@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // Configuración SMTP segura
         $mail->isSMTP();
-        $mail->Host       = 'smtp.tuservidor.com'; // Cambia por tu servidor SMTP
+        $mail->Host       = 'pyasowe@gmail.com'; // Cambia por tu servidor SMTP
         $mail->SMTPAuth   = true;
         $mail->Username   = 'usuario@tuservidor.com'; // Tu usuario SMTP
         $mail->Password   = 'tu_password_segura';     // Tu contraseña SMTP
