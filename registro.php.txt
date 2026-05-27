@@ -1,0 +1,216 @@
+<?php
+// Iniciar sesión
+session_start();
+
+// Incluir configuración
+require_once 'config.php';
+
+// Variables para mostrar mensajes
+$mensaje = '';
+$tipo_mensaje = '';
+
+// Procesar el formulario
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Obtener y limpiar datos
+    $nombre = trim($_POST['nombre'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $contraseña = $_POST['contraseña'] ?? '';
+    $confirmar_contraseña = $_POST['confirmar_contraseña'] ?? '';
+
+    // Validaciones
+    $errores = [];
+
+    if (empty($nombre)) {
+        $errores[] = "El nombre es requerido";
+    } elseif (strlen($nombre) < 3) {
+        $errores[] = "El nombre debe tener al menos 3 caracteres";
+    }
+
+    if (empty($email)) {
+        $errores[] = "El email es requerido";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errores[] = "El email no es válido";
+    }
+
+    if (empty($contraseña)) {
+        $errores[] = "La contraseña es requerida";
+    } elseif (strlen($contraseña) < 6) {
+        $errores[] = "La contraseña debe tener al menos 6 caracteres";
+    }
+
+    if ($contraseña !== $confirmar_contraseña) {
+        $errores[] = "Las contraseñas no coinciden";
+    }
+
+    // Si hay errores
+    if (!empty($errores)) {
+        $mensaje = implode("<br>", $errores);
+        $tipo_mensaje = 'error';
+    } else {
+        // Intentar registrar al usuario
+        $resultado = registrarUsuario($nombre, $email, $contraseña);
+
+        if ($resultado === true) {
+            $mensaje = "¡Registro exitoso! Se ha enviado un email de confirmación a <strong>$email</strong>";
+            $tipo_mensaje = 'exito';
+            // Limpiar formulario
+            $_POST = [];
+        } else {
+            $mensaje = $resultado; // Mensaje de error
+            $tipo_mensaje = 'error';
+        }
+    }
+}
+
+/**
+ * Función para registrar usuario y enviar email
+ */
+function registrarUsuario($nombre, $email, $contraseña) {
+    global $conexion;
+
+    // Verificar si el email ya existe
+    $stmt = $conexion->prepare("SELECT id FROM usuarios WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $resultado = $stmt->get_result();
+
+    if ($resultado->num_rows > 0) {
+        return "El email ya está registrado";
+    }
+
+    // Hashear contraseña
+    $contraseña_hash = password_hash($contraseña, PASSWORD_BCRYPT);
+
+    // Generar token de confirmación
+    $token = bin2hex(random_bytes(32));
+    $fecha_registro = date('Y-m-d H:i:s');
+
+    // Insertar usuario
+    $stmt = $conexion->prepare("INSERT INTO usuarios (nombre, email, contraseña, token_confirmacion, confirmado, fecha_registro) VALUES (?, ?, ?, ?, 0, ?)");
+    $stmt->bind_param("sssss", $nombre, $email, $contraseña_hash, $token, $fecha_registro);
+
+    if (!$stmt->execute()) {
+        return "Error al registrar el usuario: " . $conexion->error;
+    }
+
+    // Enviar email de confirmación
+    if (enviarEmailConfirmacion($nombre, $email, $token)) {
+        return true;
+    } else {
+        return "Usuario registrado pero hubo un error al enviar el email";
+    }
+}
+
+/**
+ * Función para enviar email de confirmación
+ */
+function enviarEmailConfirmacion($nombre, $email, $token) {
+    $asunto = "Confirma tu registro";
+    
+    $enlace_confirmacion = BASE_URL . "confirmar.php?token=" . $token;
+    
+    $mensaje = "
+    <html>
+        <head>
+            <title>Confirma tu registro</title>
+        </head>
+        <body style='font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;'>
+            <div style='background-color: #ffffff; padding: 20px; border-radius: 5px; max-width: 600px; margin: 0 auto;'>
+                <h2>¡Bienvenido $nombre!</h2>
+                <p>Gracias por registrarte. Para completar tu registro, por favor haz clic en el siguiente enlace:</p>
+                <p>
+                    <a href='$enlace_confirmacion' style='background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>
+                        Confirmar Registro
+                    </a>
+                </p>
+                <p>O copia y pega este enlace en tu navegador:</p>
+                <p><small>$enlace_confirmacion</small></p>
+                <p>Este enlace expirará en 24 horas.</p>
+                <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
+                <p style='font-size: 12px; color: #666;'>Si no solicitaste este registro, ignora este email.</p>
+            </div>
+        </body>
+    </html>
+    ";
+
+    $headers = "MIME-Version: 1.0" . "\r\n";
+    $headers .= "Content-type: text/html; charset=UTF-8" . "\r\n";
+    $headers .= "From: " . MAIL_FROM . "\r\n";
+
+    return mail($email, $asunto, $mensaje, $headers);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Usuario</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="contenedor">
+        <div class="formulario-registro">
+            <h1>Registro de Usuario</h1>
+
+            <?php if (!empty($mensaje)): ?>
+                <div class="mensaje <?php echo $tipo_mensaje; ?>">
+                    <?php echo $mensaje; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" action="index.php" novalidate>
+                <div class="grupo-formulario">
+                    <label for="nombre">Nombre Completo:</label>
+                    <input 
+                        type="text" 
+                        id="nombre" 
+                        name="nombre" 
+                        value="<?php echo htmlspecialchars($_POST['nombre'] ?? ''); ?>"
+                        required
+                    >
+                </div>
+
+                <div class="grupo-formulario">
+                    <label for="email">Email:</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
+                        required
+                    >
+                </div>
+
+                <div class="grupo-formulario">
+                    <label for="contraseña">Contraseña:</label>
+                    <input 
+                        type="password" 
+                        id="contraseña" 
+                        name="contraseña" 
+                        required
+                    >
+                </div>
+
+                <div class="grupo-formulario">
+                    <label for="confirmar_contraseña">Confirmar Contraseña:</label>
+                    <input 
+                        type="password" 
+                        id="confirmar_contraseña" 
+                        name="confirmar_contraseña" 
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="boton">Registrarse</button>
+            </form>
+
+            <p class="enlace-login">
+                ¿Ya tienes cuenta? <a href="login.php">Inicia sesión aquí</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
