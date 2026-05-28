@@ -9,6 +9,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $contenido = "Nombre: $nombre\nEmail: $email\nMensaje:\n$mensaje";
     $cabeceras = "From: $email\r\nReply-To: $email\r\n";
 
+
+    if ($_POST['submit']) {
+if (mail($para, $titulo, $msjCorreo, $header)) {
+echo "<script language='javascript'>
+alert('Mensaje enviado, muchas gracias.');
+window.location.href = 'http://www.elchat.net/htmlchat/elchat.html';
+
     if (mail($destinatario, $asunto, $contenido, $cabeceras)) {
         echo "✅ Mensaje enviado correctamente.";
     } else {
